@@ -1,0 +1,325 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>sigma christmas adventure game</title>
+<link rel="icon" type="image/png" href="images/sigma%20santa.png">
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: #002b36;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    user-select: none;
+  }
+  h1 {
+    margin-top: 20px;
+    margin-bottom: 10px;
+    color: #ff3c00;
+    text-shadow: 0 0 5px #ff3c00;
+  }
+  #game-container {
+    position: relative;
+    width: 800px;
+    height: 500px;
+    background: url('images/tree.png') no-repeat center/cover;
+    border: 5px solid #ff3c00;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .present {
+    width: 50px;
+    height: 50px;
+    position: absolute;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .present:hover {
+    transform: scale(1.2);
+    z-index: 10;
+  }
+  #santa {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+    width: 120px;
+    height: auto;
+    user-select: none;
+  }
+  #status {
+    margin: 15px;
+    font-size: 1.2em;
+  }
+  #inventory {
+    margin-top: 10px;
+    display: flex;
+    gap: 10px;
+    min-height: 60px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .inventory-item {
+    width: 40px;
+    height: 40px;
+    cursor: pointer;
+  }
+  #instructions {
+    margin: 20px 0 10px 0;
+    font-size: 1em;
+    max-width: 800px;
+    text-align: center;
+    color: #ccc;
+  }
+  #reset-btn {
+    background: #ff3c00;
+    border: none;
+    padding: 10px 20px;
+    color: #fff;
+    font-weight: bold;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    box-shadow: 0 0 8px #ff3c00;
+  }
+  #reset-btn:hover {
+    background: #e13500;
+  }
+</style>
+</head>
+<body>
+<h1>sigma lost his presents</h1>
+<div id="instructions">
+  Click on the presents hidden in the workshop to collect them.<br>
+  Drag and drop collected presents onto Santa or click a collected present to deliver it.<br>
+  Deliver all presents to complete the game!
+</div>
+<div id="game-container" aria-label="Santa's Workshop game area" role="main">
+  <img id="santa" src="images/sigma%20santa.png" alt="Santa Claus">
+</div>
+<div id="status">Presents found: 0 / 0</div>
+<div id="inventory" aria-label="Collected presents inventory"></div>
+<button id="reset-btn">Restart Game</button>
+
+<script>
+  const gameContainer = document.getElementById('game-container');
+  const inventory = document.getElementById('inventory');
+  const status = document.getElementById('status');
+  const santa = document.getElementById('santa');
+  const resetBtn = document.getElementById('reset-btn');
+
+  // Random number of presents between min and max
+  const minPresents = 3;
+  const maxPresents = 8;
+  let presentsToFind = 0;
+  let presentsFound = 0;
+
+  // Present image names - must be available in same folder or accessible path
+  const presentImageNames = [
+    'present purple.png',
+    'present green.png',
+    'present gold.png',
+  ];
+
+  // Size constants
+  const presentSize = 50; // width and height of presents
+
+  // Track collected presents
+  let collectedPresents = [];
+
+  // Store presents data: each present has a random image and position
+  let presentsData = [];
+
+  // Helper to get random present image from the array
+  function getRandomPresentImage() {
+    const idx = Math.floor(Math.random() * presentImageNames.length);
+    return presentImageNames[idx];
+  }
+
+  // Check if two rectangles overlap
+  function isOverlapping(r1, r2) {
+    return !(
+      r1.left + r1.width <= r2.left ||
+      r2.left + r2.width <= r1.left ||
+      r1.top + r1.height <= r2.top ||
+      r2.top + r2.height <= r1.top
+    );
+  }
+
+  // Generate random position inside game container, avoiding overlaps and santa
+  function getRandomPosition(existingRects, santaRect) {
+    const containerWidth = gameContainer.clientWidth;
+    const containerHeight = gameContainer.clientHeight;
+
+    let attempt = 0;
+    while (attempt < 1000) {
+      const left = Math.floor(Math.random() * (containerWidth - presentSize));
+      const top = Math.floor(Math.random() * (containerHeight - presentSize));
+
+      const newRect = { top, left, width: presentSize, height: presentSize };
+
+      // Check overlap with santa
+      if (isOverlapping(newRect, santaRect)) {
+        attempt++;
+        continue;
+      }
+
+      // Check overlap with existing presents
+      let overlapFound = false;
+      for (const rect of existingRects) {
+        if (isOverlapping(newRect, rect)) {
+          overlapFound = true;
+          break;
+        }
+      }
+      if (!overlapFound) {
+        return newRect;
+      }
+      attempt++;
+    }
+    // If no suitable position found, just return a default (top-left)
+    return { top: 10, left: 10, width: presentSize, height: presentSize };
+  }
+
+  // Initialize game presents on the workshop floor
+  function placePresents() {
+    presentsData = [];
+    collectedPresents = [];
+    presentsFound = 0;
+    // Randomize number of presents
+    presentsToFind = Math.floor(Math.random() * (maxPresents - minPresents + 1)) + minPresents;
+    status.textContent = `Presents found: 0 / ${presentsToFind}`;
+    inventory.innerHTML = '';
+    document.querySelectorAll('.present').forEach((el) => el.remove());
+
+    const santaRect = {
+      left: santa.offsetLeft,
+      top: santa.offsetTop,
+      width: santa.offsetWidth,
+      height: santa.offsetHeight,
+    };
+
+    const existingRects = [];
+
+    for (let i = 0; i < presentsToFind; i++) {
+      const imgName = getRandomPresentImage();
+
+      // Get random position that doesn't overlap
+      const pos = getRandomPosition(existingRects, santaRect);
+      existingRects.push(pos);
+
+      presentsData.push({ imgName, pos });
+
+      const present = document.createElement('img');
+      present.src = imgName;
+      present.classList.add('present');
+      present.style.top = pos.top + 'px';
+      present.style.left = pos.left + 'px';
+      present.setAttribute('data-id', i);
+      present.setAttribute('alt', 'Wrapped present');
+      present.setAttribute('tabindex', '0');
+      present.title = 'Click to collect present';
+      present.addEventListener('click', collectPresent);
+      present.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          collectPresent.call(present);
+        }
+      });
+      gameContainer.appendChild(present);
+    }
+  }
+
+  // Collect present function (from workshop)
+  function collectPresent() {
+    const id = this.getAttribute('data-id');
+    if (!collectedPresents.includes(id)) {
+      collectedPresents.push(id);
+      presentsFound++;
+      status.textContent = `Presents found: ${presentsFound} / ${presentsToFind}`;
+      this.removeEventListener('click', collectPresent);
+      this.remove();
+      addToInventory(id);
+      if (presentsFound === presentsToFind) {
+        status.textContent = 'All presents found! Deliver them to Santa!';
+      }
+    }
+  }
+
+  // Add present icon to inventory for drag and click delivery
+  function addToInventory(id) {
+    const invItem = document.createElement('img');
+    invItem.src = presentsData[id].imgName;
+    invItem.classList.add('inventory-item');
+    invItem.setAttribute('data-id', id);
+    invItem.setAttribute('alt', 'Collected present');
+    invItem.setAttribute('draggable', 'true');
+    invItem.title = 'Drag to Santa to deliver or click to deliver';
+    invItem.addEventListener('dragstart', dragStart);
+    // Click collected present to deliver
+    invItem.addEventListener('click', () => deliverPresent(id));
+    inventory.appendChild(invItem);
+  }
+
+  // Drag & Drop handlers
+  let draggedItem = null;
+
+  function dragStart(e) {
+    draggedItem = e.target;
+    e.dataTransfer.setData('text/plain', draggedItem.getAttribute('data-id'));
+  }
+
+  santa.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    santa.style.filter = 'drop-shadow(0 0 8px #ff3c00)';
+  });
+
+  santa.addEventListener('dragleave', () => {
+    santa.style.filter = 'none';
+  });
+
+  santa.addEventListener('drop', (e) => {
+    e.preventDefault();
+    santa.style.filter = 'none';
+    const id = e.dataTransfer.getData('text/plain');
+    deliverPresent(id);
+  });
+
+  // Deliver present to Santa (removes from inventory)
+  function deliverPresent(id) {
+    const invItems = Array.from(inventory.children);
+    const item = invItems.find((el) => el.getAttribute('data-id') === id);
+    if (item) {
+      inventory.removeChild(item);
+      collectedPresents = collectedPresents.filter((pid) => pid !== id);
+      presentsFound--;
+      if (collectedPresents.length === 0 && presentsFound === 0) {
+        status.textContent = 'wow, you are so sigma';
+      } else if (collectedPresents.length > 0) {
+        status.textContent = `Presents remaining to deliver: ${collectedPresents.length}`;
+      } else {
+        status.textContent = `Presents found: ${presentsFound} / ${presentsToFind}`;
+      }
+    }
+  }
+
+  // Reset game
+  function resetGame() {
+    placePresents();
+  }
+
+  resetBtn.addEventListener('click', resetGame);
+
+  // Ensure Santa image is loaded to get correct size before placing presents
+  santa.addEventListener('load', () => {
+    placePresents();
+  });
+
+  // If cached and already loaded
+  if (santa.complete) {
+    placePresents();
+  }
+</script>
+
+</body></html>
