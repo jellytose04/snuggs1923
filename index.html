@@ -1,0 +1,27 @@
+<!DOCTYPE html><html lang="en"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Survive Grumble</title>
+    <link rel="stylesheet" href="css/survivegrumblestyle.css">
+</head>
+<body>
+    <h1>Survive Grumble</h1>
+    <div id="game-container">
+        <canvas id="gameCanvas" width="1920" height="1080"></canvas>
+        <div id="game-over-screen" class="hidden">
+            <h2>Game Over</h2>
+            <p>You survived for <span id="final-seconds">0</span> seconds.</p>
+            <button id="restart-button">Play Again</button>
+        </div>
+    </div>
+    <div id="score-display">Seconds: <span id="seconds">0</span></div>
+    <div id="controls">
+        <label for="player-color">Player Color:</label>
+        <input type="color" id="player-color" value="#0000ff">
+        <button id="pause-button">Pause</button>
+    </div>
+
+    <script src="js/survivegrumblescript.js"></script>
+
+
+</body></html>
